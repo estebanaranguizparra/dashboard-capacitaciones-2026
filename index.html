@@ -107,31 +107,22 @@
     </div>
   </section>
 
-  <section class="table-card">
+  <section class="collab-card">
     <div class="table-card-head">
-      <h2>Plan de acción — capacitaciones pendientes por prioridad</h2>
+      <div>
+        <h2 id="collab-title">Capacitaciones por sucursal</h2>
+        <div class="chart-sub" id="collab-sub">Completadas, en progreso y pendientes · haz clic en una sucursal para ver sus colaboradores</div>
+      </div>
+      <button class="btn" id="btn-collab-back" style="display:none">← Volver a todas las sucursales</button>
     </div>
-    <div class="chart-sub">La prioridad se calcula al momento de abrir esta página: <b>Alta</b> = fecha de término ya pasada, <b>Media</b> = vence en 15 días o menos, <b>Baja</b> = en plazo. Haz clic en las columnas para ordenar.</div>
-    <div class="table-scroll">
-      <table class="plan">
-        <thead>
-          <tr>
-            <th data-key="nombre">Alumno</th>
-            <th data-key="id">RUT</th>
-            <th data-key="sucursal">Sucursal</th>
-            <th data-key="curso">Curso</th>
-            <th data-key="fechaTermino">Fecha término</th>
-            <th data-key="prioridad">Prioridad</th>
-            <th>Acción sugerida</th>
-          </tr>
-        </thead>
-        <tbody id="plan-tbody"></tbody>
-      </table>
-      <div class="empty-state" id="table-empty" style="display:none">No hay registros que coincidan con los filtros seleccionados.</div>
+    <div class="legend">
+      <span class="item"><span class="swatch" style="background:var(--series-3)"></span>Completado</span>
+      <span class="item"><span class="swatch" style="background:var(--series-1)"></span>En progreso</span>
+      <span class="item"><span class="swatch" style="background:var(--series-2)"></span>Pendiente</span>
     </div>
+    <div class="stack-list" id="collab-chart"></div>
     <div class="table-footer">
-      <span id="table-count"></span>
-      <button class="btn" id="btn-more">Cargar más filas</button>
+      <span id="collab-count"></span>
     </div>
   </section>
 

@@ -4,9 +4,6 @@ const state = {
   raw: null,
   records: [],
   filtered: [],
-  sortKey: "prioridad",
-  sortDir: "asc",
-  rowLimit: 300,
 };
 
 const PRIORIDAD_ORDER = { Alta: 0, Media: 1, Baja: 2, "Sin acción": 3 };
@@ -132,7 +129,7 @@ function applyFilters() {
   renderChartSucursal(f);
   renderChartEstado(f);
   renderChartPrioridad(f);
-  renderTable();
+  renderCollabChart(f);
 }
 
 function renderActiveFilters(f) {
@@ -300,69 +297,106 @@ function renderChartPrioridad(f) {
   }
 }
 
-function sortRows(rows) {
-  const key = state.sortKey;
-  const dir = state.sortDir === "asc" ? 1 : -1;
-  return [...rows].sort((a, b) => {
-    let va, vb;
-    if (key === "prioridad") {
-      va = PRIORIDAD_ORDER[a.prioridad];
-      vb = PRIORIDAD_ORDER[b.prioridad];
-    } else if (key === "fechaTermino") {
-      va = a.fechaTermino || "9999";
-      vb = b.fechaTermino || "9999";
-    } else {
-      va = (a[key] || "").toString().toLowerCase();
-      vb = (b[key] || "").toString().toLowerCase();
+// Drill-down: with no sucursal selected, bars aggregate by sucursal and are
+// clickable to select one (same toggle pattern as the other charts). Once a
+// sucursal is selected, the same component re-aggregates by colaborador
+// within it — this is what the user actually asked to see.
+function renderCollabChart(f) {
+  const container = document.getElementById("collab-chart");
+  const titleEl = document.getElementById("collab-title");
+  const subEl = document.getElementById("collab-sub");
+  const backBtn = document.getElementById("btn-collab-back");
+
+  if (f.sucursal) {
+    titleEl.textContent = `Colaboradores en ${f.sucursal}`;
+    subEl.textContent = "Cursos completados, en progreso y pendientes por colaborador";
+    backBtn.style.display = "inline-block";
+
+    const byAlumno = new Map();
+    for (const r of state.filtered) {
+      if (!byAlumno.has(r.id)) byAlumno.set(r.id, { label: r.nombre, comp: 0, prog: 0, pend: 0 });
+      const a = byAlumno.get(r.id);
+      if (r.estadoCurso === "Completado") a.comp += 1;
+      else if (r.estadoCurso === "En progreso") a.prog += 1;
+      else a.pend += 1;
     }
-    if (va < vb) return -1 * dir;
-    if (va > vb) return 1 * dir;
-    return 0;
-  });
-}
-
-function badgeHtml(r) {
-  if (r.estadoCurso === "Completado") return '<span class="badge completado"><span class="dot"></span>Completado</span>';
-  if (r.prioridad === "Alta") return '<span class="badge alta"><span class="dot"></span>Alta</span>';
-  if (r.prioridad === "Media") return '<span class="badge media"><span class="dot"></span>Media</span>';
-  return '<span class="badge baja"><span class="dot"></span>Baja</span>';
-}
-
-function renderTable() {
-  const sorted = sortRows(state.filtered);
-  const shown = sorted.slice(0, state.rowLimit);
-  const tbody = document.getElementById("plan-tbody");
-  tbody.innerHTML = "";
-
-  if (!shown.length) {
-    document.getElementById("table-empty").style.display = "block";
+    const entries = Array.from(byAlumno.values()).map((a) => ({ ...a, total: a.comp + a.prog + a.pend }));
+    entries.sort((a, b) => (b.pend + b.prog) - (a.pend + a.prog) || b.total - a.total);
+    renderStackedBars(container, entries, null);
   } else {
-    document.getElementById("table-empty").style.display = "none";
-  }
+    titleEl.textContent = "Capacitaciones por sucursal";
+    subEl.textContent = "Completadas, en progreso y pendientes · haz clic en una sucursal para ver sus colaboradores";
+    backBtn.style.display = "none";
 
+    // Excludes its own "sucursal" filter like the other sucursal-dimension chart.
+    const rows = state.records.filter((r) => matchesFilters(r, f, ["sucursal"]));
+    const bySucursal = new Map();
+    for (const r of rows) {
+      if (!r.sucursal) continue;
+      if (!bySucursal.has(r.sucursal)) bySucursal.set(r.sucursal, { label: r.sucursal, comp: 0, prog: 0, pend: 0 });
+      const s = bySucursal.get(r.sucursal);
+      if (r.estadoCurso === "Completado") s.comp += 1;
+      else if (r.estadoCurso === "En progreso") s.prog += 1;
+      else s.pend += 1;
+    }
+    const entries = Array.from(bySucursal.values()).map((s) => ({ ...s, total: s.comp + s.prog + s.pend }));
+    entries.sort((a, b) => (b.pend + b.prog) - (a.pend + a.prog) || b.total - a.total);
+    renderStackedBars(container, entries, "f-sucursal");
+  }
+}
+
+function renderStackedBars(container, entries, filterId) {
+  container.innerHTML = "";
+  if (!entries.length) {
+    container.innerHTML = '<div class="empty-state">No hay registros que coincidan con los filtros seleccionados.</div>';
+    document.getElementById("collab-count").textContent = "";
+    return;
+  }
+  const max = Math.max(1, ...entries.map((e) => e.total));
   const frag = document.createDocumentFragment();
-  for (const r of shown) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td class="name">${escapeHtml(r.nombre)}</td>
-      <td>${escapeHtml(r.id)}</td>
-      <td>${escapeHtml(r.sucursal)}</td>
-      <td>${escapeHtml(r.curso)}</td>
-      <td>${escapeHtml(r.fechaTermino) || "—"}</td>
-      <td>${badgeHtml(r)}</td>
-      <td>${escapeHtml(accionSugerida(r.prioridad, r.dias))}</td>
+  for (const e of entries) {
+    const row = document.createElement("div");
+    const clickable = Boolean(filterId);
+    row.className = "stack-row" + (clickable ? " clickable" : "");
+    const safeLabel = escapeHtml(e.label);
+    const pct = (v) => (e.total ? (v / e.total) * 100 : 0);
+    row.title = `${safeLabel} — ${e.comp} completadas, ${e.prog} en progreso, ${e.pend} pendientes`;
+    row.innerHTML = `
+      <div class="name">${safeLabel}</div>
+      <div class="stack-track">
+        <div class="stack-fill" style="width:${(e.total / max) * 100}%">
+          <div class="seg comp" style="width:${pct(e.comp)}%"></div>
+          <div class="seg prog" style="width:${pct(e.prog)}%"></div>
+          <div class="seg pend" style="width:${pct(e.pend)}%"></div>
+        </div>
+      </div>
+      <div class="total">${e.total}</div>
     `;
-    frag.appendChild(tr);
+    if (clickable) {
+      row.setAttribute("role", "button");
+      row.setAttribute("tabindex", "0");
+      const activate = () => toggleFilterAndApply(filterId, e.label);
+      row.addEventListener("click", activate);
+      row.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          activate();
+        }
+      });
+    }
+    frag.appendChild(row);
   }
-  tbody.appendChild(frag);
-
-  document.getElementById("table-count").textContent =
-    `Mostrando ${shown.length.toLocaleString("es-CL")} de ${sorted.length.toLocaleString("es-CL")} registros filtrados`;
-  document.getElementById("btn-more").style.display = sorted.length > shown.length ? "inline-block" : "none";
+  container.appendChild(frag);
+  document.getElementById("collab-count").textContent =
+    `${entries.length.toLocaleString("es-CL")} ${entries.length === 1 ? "elemento" : "elementos"}`;
 }
 
 function exportCsv() {
-  const sorted = sortRows(state.filtered);
+  const sorted = [...state.filtered].sort((a, b) => {
+    const pa = PRIORIDAD_ORDER[a.prioridad], pb = PRIORIDAD_ORDER[b.prioridad];
+    if (pa !== pb) return pa - pb;
+    return (a.fechaTermino || "9999").localeCompare(b.fechaTermino || "9999");
+  });
   const header = ["id_alumno", "nombre_alumno", "sucursal", "seccion", "curso", "fecha_inicio", "fecha_termino", "estado_curso", "nota", "prioridad", "accion_sugerida"];
   const lines = [header.join(",")];
   for (const r of sorted) {
@@ -391,22 +425,9 @@ function wireEvents() {
     applyFilters();
   });
   document.getElementById("btn-export").addEventListener("click", exportCsv);
-  document.getElementById("btn-more").addEventListener("click", () => {
-    state.rowLimit += 300;
-    renderTable();
-  });
-  document.querySelectorAll("table.plan th[data-key]").forEach((th) => {
-    th.addEventListener("click", () => {
-      const key = th.dataset.key;
-      if (state.sortKey === key) {
-        state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
-      } else {
-        state.sortKey = key;
-        state.sortDir = "asc";
-      }
-      state.rowLimit = 300;
-      renderTable();
-    });
+  document.getElementById("btn-collab-back").addEventListener("click", () => {
+    document.getElementById("f-sucursal").value = "";
+    applyFilters();
   });
 }
 
