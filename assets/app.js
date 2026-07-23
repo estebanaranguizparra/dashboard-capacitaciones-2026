@@ -90,31 +90,47 @@ function fillSelect(id, options) {
   }
 }
 
+function getFilterValues() {
+  return {
+    sucursal: document.getElementById("f-sucursal").value,
+    seccion: document.getElementById("f-seccion").value,
+    curso: document.getElementById("f-curso").value,
+    estado: document.getElementById("f-estado").value,
+    prioridad: document.getElementById("f-prioridad").value,
+    q: document.getElementById("f-search").value.trim().toLowerCase(),
+  };
+}
+
+function matchesFilters(r, f, excludeKeys) {
+  const skip = excludeKeys || [];
+  if (!skip.includes("sucursal") && f.sucursal && r.sucursal !== f.sucursal) return false;
+  if (!skip.includes("seccion") && f.seccion && r.seccion !== f.seccion) return false;
+  if (!skip.includes("curso") && f.curso && r.curso !== f.curso) return false;
+  if (!skip.includes("estado") && f.estado && r.estadoCurso !== f.estado) return false;
+  if (!skip.includes("prioridad") && f.prioridad && r.prioridad !== f.prioridad) return false;
+  if (f.q) {
+    const hay = (r.nombre || "").toLowerCase().includes(f.q) || (r.id || "").toLowerCase().includes(f.q);
+    if (!hay) return false;
+  }
+  return true;
+}
+
+// Toggles a filter value from a chart click: clicking the already-selected
+// bar clears the filter instead of re-applying it, so selection acts as a switch.
+function toggleFilterAndApply(selectId, value) {
+  const el = document.getElementById(selectId);
+  el.value = el.value === value ? "" : value;
+  applyFilters();
+}
+
 function applyFilters() {
-  const sucursal = document.getElementById("f-sucursal").value;
-  const seccion = document.getElementById("f-seccion").value;
-  const curso = document.getElementById("f-curso").value;
-  const estado = document.getElementById("f-estado").value;
-  const prioridad = document.getElementById("f-prioridad").value;
-  const q = document.getElementById("f-search").value.trim().toLowerCase();
+  const f = getFilterValues();
+  state.filtered = state.records.filter((r) => matchesFilters(r, f));
 
-  state.filtered = state.records.filter((r) => {
-    if (sucursal && r.sucursal !== sucursal) return false;
-    if (seccion && r.seccion !== seccion) return false;
-    if (curso && r.curso !== curso) return false;
-    if (estado && r.estadoCurso !== estado) return false;
-    if (prioridad && r.prioridad !== prioridad) return false;
-    if (q) {
-      const hay = (r.nombre || "").toLowerCase().includes(q) || (r.id || "").toLowerCase().includes(q);
-      if (!hay) return false;
-    }
-    return true;
-  });
-
-  renderActiveFilters({ sucursal, seccion, curso, estado, prioridad, q });
+  renderActiveFilters(f);
   renderKPIs();
-  renderChartSucursal();
-  renderChartEstado();
+  renderChartSucursal(f);
+  renderChartEstado(f);
   renderTable();
 }
 
@@ -148,8 +164,10 @@ function renderKPIs() {
   document.getElementById("kpi-media").textContent = media.toLocaleString("es-CL");
 }
 
-function renderChartSucursal() {
-  const rows = state.filtered;
+function renderChartSucursal(f) {
+  // Ignores its own "sucursal" filter so the chart still shows a comparison
+  // across branches even while one is selected — the click IS the filter.
+  const rows = state.records.filter((r) => matchesFilters(r, f, ["sucursal"]));
   const bySucursal = new Map();
   for (const r of rows) {
     if (!r.sucursal) continue;
@@ -172,19 +190,33 @@ function renderChartSucursal() {
   }
   for (const e of entries) {
     const row = document.createElement("div");
-    row.className = "hbar-row";
+    const isSelected = f.sucursal === e.sucursal;
+    row.className = "hbar-row" + (isSelected ? " selected" : "");
+    row.setAttribute("role", "button");
+    row.setAttribute("tabindex", "0");
+    row.setAttribute("aria-pressed", String(isSelected));
     const safeName = escapeHtml(e.sucursal);
+    row.title = `${safeName} — clic para ${isSelected ? "quitar" : "aplicar"} como filtro`;
     row.innerHTML = `
-      <div class="name" title="${safeName}">${safeName}</div>
+      <div class="name">${safeName}</div>
       <div class="hbar-track"><div class="hbar-fill" style="width:${Math.max(e.tasa, 2)}%"></div></div>
       <div class="pct">${e.tasa.toFixed(0)}%</div>
     `;
+    const activate = () => toggleFilterAndApply("f-sucursal", e.sucursal);
+    row.addEventListener("click", activate);
+    row.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        activate();
+      }
+    });
     container.appendChild(row);
   }
 }
 
-function renderChartEstado() {
-  const rows = state.filtered;
+function renderChartEstado(f) {
+  // Ignores its own "estado" filter for the same reason as renderChartSucursal.
+  const rows = state.records.filter((r) => matchesFilters(r, f, ["estado"]));
   const counts = { Completado: 0, Pendiente: 0, "En progreso": 0 };
   for (const r of rows) {
     if (counts[r.estadoCurso] !== undefined) counts[r.estadoCurso] += 1;
@@ -195,7 +227,20 @@ function renderChartEstado() {
   const colors = { Completado: "var(--series-3)", Pendiente: "var(--series-2)", "En progreso": "var(--series-1)" };
   for (const [estado, val] of Object.entries(counts)) {
     const col = document.createElement("div");
-    col.className = "estado-bar-col";
+    const isSelected = f.estado === estado;
+    col.className = "estado-bar-col" + (isSelected ? " selected" : "");
+    col.setAttribute("role", "button");
+    col.setAttribute("tabindex", "0");
+    col.setAttribute("aria-pressed", String(isSelected));
+    col.title = `${estado} — clic para ${isSelected ? "quitar" : "aplicar"} como filtro`;
+    const activate = () => toggleFilterAndApply("f-estado", estado);
+    col.addEventListener("click", activate);
+    col.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        activate();
+      }
+    });
     const h = Math.max((val / max) * 100, val > 0 ? 4 : 0);
     col.innerHTML = `
       <div class="val">${val.toLocaleString("es-CL")}</div>
