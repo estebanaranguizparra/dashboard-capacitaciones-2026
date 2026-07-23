@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard Capacitaciones 2026</title>
+<link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+
+<div id="loading" class="loading">Cargando datos de capacitaciones…</div>
+
+<div id="app" style="display:none">
+  <header class="top">
+    <div>
+      <h1>Dashboard Capacitaciones 2026</h1>
+      <p>Datos generados el <span id="generado-fecha"></span> · fuente: Libro de Clases</p>
+    </div>
+    <div class="top-links">
+      <a href="https://drive.google.com/drive/folders/1QdHNyQrSspkdD5PRkxy8pInLzA9_k7n2" target="_blank" rel="noopener">Google Sheets (resúmenes)</a>
+      <a href="data/capacitaciones_long.csv" target="_blank" rel="noopener">Datos completos (CSV)</a>
+    </div>
+  </header>
+
+  <section class="kpi-row">
+    <div class="kpi-tile">
+      <div class="label">Alumnos (filtro actual)</div>
+      <div class="value" id="kpi-alumnos">—</div>
+    </div>
+    <div class="kpi-tile">
+      <div class="label">Capacitaciones (filtro actual)</div>
+      <div class="value" id="kpi-total">—</div>
+    </div>
+    <div class="kpi-tile">
+      <div class="label">Tasa de cumplimiento</div>
+      <div class="value" id="kpi-tasa">—</div>
+      <div class="sub">completadas / total del filtro</div>
+    </div>
+    <div class="kpi-tile alta">
+      <div class="label">Prioridad Alta</div>
+      <div class="value" id="kpi-alta">—</div>
+      <div class="sub">vencidas, sin completar</div>
+    </div>
+    <div class="kpi-tile media">
+      <div class="label">Prioridad Media</div>
+      <div class="value" id="kpi-media">—</div>
+      <div class="sub">vencen en ≤ 15 días</div>
+    </div>
+  </section>
+
+  <section class="filters">
+    <div class="filter-field">
+      <label for="f-sucursal">Sucursal</label>
+      <select id="f-sucursal"><option value="">Todas</option></select>
+    </div>
+    <div class="filter-field">
+      <label for="f-seccion">Sección</label>
+      <select id="f-seccion"><option value="">Todas</option></select>
+    </div>
+    <div class="filter-field">
+      <label for="f-curso">Curso</label>
+      <select id="f-curso"><option value="">Todos</option></select>
+    </div>
+    <div class="filter-field">
+      <label for="f-estado">Estado</label>
+      <select id="f-estado">
+        <option value="">Todos</option>
+        <option value="Completado">Completado</option>
+        <option value="Pendiente">Pendiente</option>
+        <option value="En progreso">En progreso</option>
+      </select>
+    </div>
+    <div class="filter-field">
+      <label for="f-prioridad">Prioridad</label>
+      <select id="f-prioridad">
+        <option value="">Todas</option>
+        <option value="Alta">Alta</option>
+        <option value="Media">Media</option>
+        <option value="Baja">Baja</option>
+        <option value="Sin acción">Sin acción</option>
+      </select>
+    </div>
+    <div class="filter-field grow">
+      <label for="f-search">Buscar alumno o RUT</label>
+      <input type="text" id="f-search" placeholder="Nombre o RUT…" />
+    </div>
+    <button class="btn" id="btn-clear">Limpiar filtros</button>
+    <button class="btn primary" id="btn-export">Exportar CSV filtrado</button>
+    <div class="active-filters" id="active-filters"></div>
+  </section>
+
+  <section class="charts-row">
+    <div class="chart-card">
+      <h2>Sucursales con menor tasa de cumplimiento</h2>
+      <div class="chart-sub">Top 12 con más rezago (mínimo 5 capacitaciones asignadas)</div>
+      <div id="chart-sucursal"></div>
+    </div>
+    <div class="chart-card">
+      <h2>Distribución por estado</h2>
+      <div class="chart-sub">Capacitaciones del filtro actual</div>
+      <div class="estado-bars" id="chart-estado"></div>
+    </div>
+  </section>
+
+  <section class="table-card">
+    <div class="table-card-head">
+      <h2>Plan de acción — capacitaciones pendientes por prioridad</h2>
+    </div>
+    <div class="chart-sub">La prioridad se calcula al momento de abrir esta página: <b>Alta</b> = fecha de término ya pasada, <b>Media</b> = vence en 15 días o menos, <b>Baja</b> = en plazo. Haz clic en las columnas para ordenar.</div>
+    <div class="table-scroll">
+      <table class="plan">
+        <thead>
+          <tr>
+            <th data-key="nombre">Alumno</th>
+            <th data-key="id">RUT</th>
+            <th data-key="sucursal">Sucursal</th>
+            <th data-key="curso">Curso</th>
+            <th data-key="fechaTermino">Fecha término</th>
+            <th data-key="prioridad">Prioridad</th>
+            <th>Acción sugerida</th>
+          </tr>
+        </thead>
+        <tbody id="plan-tbody"></tbody>
+      </table>
+      <div class="empty-state" id="table-empty" style="display:none">No hay registros que coincidan con los filtros seleccionados.</div>
+    </div>
+    <div class="table-footer">
+      <span id="table-count"></span>
+      <button class="btn" id="btn-more">Cargar más filas</button>
+    </div>
+  </section>
+
+  <footer class="page-footer">
+    <span>Dashboard Capacitaciones 2026 · generado a partir del Libro de Clases</span>
+    <span>Prioridades recalculadas en cada visita con la fecha del navegador</span>
+  </footer>
+</div>
+
+<script src="assets/app.js"></script>
+</body>
+</html>
