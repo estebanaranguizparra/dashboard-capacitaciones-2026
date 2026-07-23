@@ -119,6 +119,7 @@ button.btn.primary { background: var(--series-1); color: #fff; border-color: var
 }
 .chart-card h2 { font-size: 14px; margin: 0 0 2px; }
 .chart-card .chart-sub { font-size: 11px; color: var(--text-muted); margin-bottom: 12px; }
+.chart-card-full { margin-bottom: 20px; }
 
 .hbar-row {
   display: grid; grid-template-columns: 160px 1fr 48px; align-items: center; gap: 8px;
@@ -128,6 +129,8 @@ button.btn.primary { background: var(--series-1); color: #fff; border-color: var
 .hbar-row .name { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hbar-track { background: var(--gridline); border-radius: 4px; height: 14px; position: relative; }
 .hbar-fill { background: var(--seq-450); border-radius: 4px; height: 100%; transition: background 0.15s; }
+.hbar-fill.pend { background: var(--series-2); }
+.hbar-row.selected .hbar-fill.pend { background: var(--critical); }
 .hbar-row .pct { color: var(--text-muted); text-align: right; font-variant-numeric: tabular-nums; }
 .hbar-row:hover { background: var(--surface-2); }
 .hbar-row:hover .name { color: var(--series-1); }

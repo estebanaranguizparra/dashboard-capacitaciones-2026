@@ -129,6 +129,7 @@ function applyFilters() {
   renderChartSucursal(f);
   renderChartEstado(f);
   renderChartPrioridad(f);
+  renderChartCursosPendientes(f);
   renderCollabChart(f);
 }
 
@@ -201,6 +202,57 @@ function renderChartSucursal(f) {
       <div class="pct">${e.tasa.toFixed(0)}%</div>
     `;
     const activate = () => toggleFilterAndApply("f-sucursal", e.sucursal);
+    row.addEventListener("click", activate);
+    row.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        activate();
+      }
+    });
+    container.appendChild(row);
+  }
+}
+
+function renderChartCursosPendientes(f) {
+  const titleEl = document.getElementById("cursos-pend-title");
+  titleEl.textContent = f.sucursal ? `Top 10 cursos pendientes en ${f.sucursal}` : "Top 10 cursos pendientes (global)";
+
+  // Excludes its own "curso" filter (so it keeps comparing across courses)
+  // and "estado" (this chart's metric IS the Pendiente count, independent
+  // of whichever estado bar the user has selected elsewhere). Respects the
+  // sucursal filter on purpose — that's what switches global vs. por-sucursal.
+  const rows = state.records.filter((r) => matchesFilters(r, f, ["curso", "estado"]));
+  const byCurso = new Map();
+  for (const r of rows) {
+    if (r.estadoCurso !== "Pendiente") continue;
+    byCurso.set(r.curso, (byCurso.get(r.curso) || 0) + 1);
+  }
+  let entries = Array.from(byCurso.entries()).map(([curso, count]) => ({ curso, count }));
+  entries.sort((a, b) => b.count - a.count);
+  entries = entries.slice(0, 10);
+
+  const container = document.getElementById("chart-cursos-pendientes");
+  container.innerHTML = "";
+  if (!entries.length) {
+    container.innerHTML = '<div class="empty-state">No hay cursos pendientes para este filtro.</div>';
+    return;
+  }
+  const max = entries[0].count;
+  for (const e of entries) {
+    const row = document.createElement("div");
+    const isSelected = f.curso === e.curso;
+    row.className = "hbar-row" + (isSelected ? " selected" : "");
+    row.setAttribute("role", "button");
+    row.setAttribute("tabindex", "0");
+    row.setAttribute("aria-pressed", String(isSelected));
+    const safeName = escapeHtml(e.curso);
+    row.title = `${safeName} — ${e.count} pendientes · clic para ${isSelected ? "quitar" : "aplicar"} como filtro`;
+    row.innerHTML = `
+      <div class="name">${safeName}</div>
+      <div class="hbar-track"><div class="hbar-fill pend" style="width:${Math.max((e.count / max) * 100, 2)}%"></div></div>
+      <div class="pct">${e.count.toLocaleString("es-CL")}</div>
+    `;
+    const activate = () => toggleFilterAndApply("f-curso", e.curso);
     row.addEventListener("click", activate);
     row.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter" || ev.key === " ") {
