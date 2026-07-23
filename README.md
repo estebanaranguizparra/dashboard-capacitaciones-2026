@@ -7,10 +7,10 @@ KPIs y un plan de acción priorizado.
 
 ## Contenido
 
-- `index.html`, `assets/` — dashboard estático (HTML/CSS/JS sin dependencias externas).
+- `index.html`, `assets/` — dashboard estático (HTML/CSS/JS, sin dependencias externas vía CDN: la librería de lectura de Excel, SheetJS, está vendorizada en `assets/vendor/`).
 - `data/capacitaciones.json` — datos normalizados que consume el dashboard (alumnos, cursos, capacitaciones).
 - `data/capacitaciones_long.csv` — mismos datos en formato largo (una fila por alumno-curso), para análisis en Excel/Sheets.
-- `scripts/transform.py` — script que genera los archivos de `data/` a partir del Excel original ("Libro de Clases").
+- `scripts/transform.py` — script CLI equivalente que genera los archivos de `data/` a partir del Excel original (alternativa a cargarlo desde el navegador, ver abajo).
 
 ## Cómo se calcula la prioridad
 
@@ -25,14 +25,30 @@ generación de los datos):
 
 ## Actualizar los datos
 
-Cuando haya una nueva exportación del Libro de Clases:
+### Opción 1: cargar el Excel directamente en el dashboard (recomendado)
+
+El dashboard tiene un botón **"Cargar archivo .xlsx"** arriba de los KPIs. Sirve para
+previsualizar una exportación nueva del Libro de Clases sin instalar nada:
+
+1. Descarga el Excel desde el sistema de origen (mismo formato, sin editar columnas).
+2. Ábrelo en el dashboard con ese botón — el navegador lo procesa localmente (nunca se
+   sube a ningún servidor) y todos los filtros, KPIs y gráficos se refrescan al instante.
+3. **Importante:** esto solo actualiza lo que ves *en tu navegador*. El sitio publicado
+   (lo que ve cualquier otra persona con el link) no cambia hasta que lo publiques:
+   usa los botones **"Descargar capacitaciones.json"** y **"Descargar CSV completo"**
+   que aparecen tras la carga, reemplaza esos dos archivos dentro de `data/` en este
+   repositorio, y haz commit + push. GitHub Pages se actualiza solo un par de minutos
+   después del push.
+
+### Opción 2: línea de comandos
 
 ```bash
 python3 scripts/transform.py <ruta_al_excel_nuevo>.xlsx data
 ```
 
-Esto regenera `data/capacitaciones.json` y `data/capacitaciones_long.csv`. Luego
-confirma los cambios con git y haz push — GitHub Pages se actualiza automáticamente.
+Genera los mismos `data/capacitaciones.json` y `data/capacitaciones_long.csv` que la
+opción 1, útil para automatizar la actualización (cron, CI, etc.) sin pasar por el
+navegador. Luego confirma los cambios con git y haz push.
 
 ## Google Sheets
 

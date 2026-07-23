@@ -14,13 +14,29 @@
   <header class="top">
     <div>
       <h1>Dashboard Capacitaciones 2026</h1>
-      <p>Datos generados el <span id="generado-fecha"></span> · fuente: Libro de Clases</p>
+      <p id="fuente-datos">Datos generados el <span id="generado-fecha"></span> · fuente: Libro de Clases</p>
     </div>
     <div class="top-links">
       <a href="https://drive.google.com/drive/folders/1QdHNyQrSspkdD5PRkxy8pInLzA9_k7n2" target="_blank" rel="noopener">Google Sheets (resúmenes)</a>
       <a href="data/capacitaciones_long.csv" target="_blank" rel="noopener">Datos completos (CSV)</a>
     </div>
   </header>
+
+  <section class="upload-card">
+    <div class="upload-row">
+      <div>
+        <h2>Actualizar datos desde el Libro de Clases</h2>
+        <div class="chart-sub">Descarga el Excel original del sistema y cárgalo aquí (mismo formato, sin editar columnas) para refrescar el dashboard con la información más reciente.</div>
+      </div>
+      <div class="upload-actions">
+        <input type="file" id="file-upload" accept=".xlsx" hidden />
+        <button class="btn primary" id="btn-upload">Cargar archivo .xlsx</button>
+        <button class="btn" id="btn-download-json" hidden>Descargar capacitaciones.json</button>
+        <button class="btn" id="btn-download-csv" hidden>Descargar CSV completo</button>
+      </div>
+    </div>
+    <div class="upload-status" id="upload-status"></div>
+  </section>
 
   <section class="kpi-row">
     <div class="kpi-tile">
@@ -138,6 +154,7 @@
   </footer>
 </div>
 
+<script src="assets/vendor/xlsx.full.min.js"></script>
 <script src="assets/app.js"></script>
 </body>
 </html>

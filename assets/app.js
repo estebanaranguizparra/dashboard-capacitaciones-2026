@@ -43,6 +43,7 @@ async function loadData() {
       id: alumno.id,
       nombre: alumno.nombre,
       estadoEmpleado: alumno.estado_empleado,
+      fechaIngreso: alumno.fecha_ingreso || "",
       seccion: alumno.seccion,
       sucursal: alumno.sucursal,
       curso,
@@ -55,6 +56,187 @@ async function loadData() {
     });
   }
   state.records = records;
+}
+
+// --- Carga de un Libro de Clases (.xlsx) directamente en el navegador ---
+// Mismo formato ancho que el export original: columnas 1-6 son datos del
+// alumno, luego bloques repetidos de 5 columnas (Curso, Fecha Inicio,
+// Fecha Término, Estado, Nota) — uno por capacitación asignada. Espeja la
+// logica de scripts/transform.py para producir el mismo shape de "records"
+// que loadData(), asi el resto del dashboard no distingue el origen de los datos.
+
+function excelDateToISO(v) {
+  if (v === null || v === undefined || v === "") return "";
+  if (v instanceof Date) {
+    const y = v.getFullYear();
+    const m = String(v.getMonth() + 1).padStart(2, "0");
+    const d = String(v.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  const m = String(v).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return "";
+  const [, dd, mm, yyyy] = m;
+  return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+}
+
+function parseWorkbookRecords(workbook) {
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: "" });
+  if (!rows.length || String(rows[0][0]).trim() !== "Id Alumno") {
+    throw new Error(
+      "El archivo no tiene el formato esperado (se esperaba 'Id Alumno' en la primera columna de la primera fila)."
+    );
+  }
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const records = [];
+
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    const idAlumno = row[0];
+    if (idAlumno === "" || idAlumno === undefined || idAlumno === null) continue;
+    const nombre = row[1];
+    const estadoEmpleado = row[2];
+    const fechaIngreso = excelDateToISO(row[3]);
+    const seccion = row[4];
+    const sucursal = row[5];
+
+    for (let base = 6; base < row.length; base += 5) {
+      const curso = row[base];
+      if (curso === "" || curso === undefined || curso === null) continue;
+      const fechaInicio = excelDateToISO(row[base + 1]);
+      const fechaTermino = excelDateToISO(row[base + 2]);
+      const estadoCurso = row[base + 3] || "Pendiente";
+      const notaRaw = row[base + 4];
+      const nota = notaRaw === "" || notaRaw === undefined || notaRaw === null ? "" : notaRaw;
+      const prioridad = clasificarPrioridad(estadoCurso, fechaTermino, hoy);
+      const dias = fechaTermino ? Math.round((new Date(fechaTermino + "T00:00:00") - hoy) / 86400000) : null;
+
+      records.push({
+        id: String(idAlumno).trim(),
+        nombre,
+        estadoEmpleado,
+        fechaIngreso,
+        seccion,
+        sucursal,
+        curso,
+        fechaInicio,
+        fechaTermino,
+        estadoCurso,
+        nota,
+        prioridad,
+        dias,
+      });
+    }
+  }
+  return records;
+}
+
+// Rebuilds the same normalized {alumnos, cursos, capacitaciones} shape as
+// data/capacitaciones.json, so the downloaded file can directly replace it.
+function buildExportData(records) {
+  const alumnoIndex = new Map();
+  const alumnos = [];
+  const cursoIndex = new Map();
+  const cursos = [];
+  const capacitaciones = [];
+
+  for (const r of records) {
+    if (!alumnoIndex.has(r.id)) {
+      alumnoIndex.set(r.id, alumnos.length);
+      alumnos.push({
+        id: r.id,
+        nombre: r.nombre,
+        estado_empleado: r.estadoEmpleado,
+        fecha_ingreso: r.fechaIngreso || "",
+        seccion: r.seccion,
+        sucursal: r.sucursal,
+      });
+    }
+    if (!cursoIndex.has(r.curso)) {
+      cursoIndex.set(r.curso, cursos.length);
+      cursos.push(r.curso);
+    }
+    capacitaciones.push([alumnoIndex.get(r.id), cursoIndex.get(r.curso), r.fechaInicio, r.fechaTermino, r.estadoCurso, r.nota]);
+  }
+
+  return {
+    generado: new Date().toISOString().slice(0, 10),
+    columnas_capacitacion: ["alumno_idx", "curso_idx", "fecha_inicio", "fecha_termino", "estado_curso", "nota"],
+    alumnos,
+    cursos,
+    capacitaciones,
+  };
+}
+
+function buildExportCsv(records) {
+  const header = ["id_alumno", "nombre_alumno", "estado_empleado", "fecha_ingreso", "seccion", "sucursal", "curso", "fecha_inicio", "fecha_termino", "estado_curso", "nota", "prioridad", "accion_sugerida"];
+  const lines = [header.join(",")];
+  for (const r of records) {
+    const accion = accionSugerida(r.prioridad, r.dias);
+    const vals = [r.id, r.nombre, r.estadoEmpleado, r.fechaIngreso, r.seccion, r.sucursal, r.curso, r.fechaInicio, r.fechaTermino, r.estadoCurso, r.nota, r.prioridad, accion]
+      .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`);
+    lines.push(vals.join(","));
+  }
+  return lines.join("\n");
+}
+
+function downloadFile(filename, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function setUploadStatus(html) {
+  document.getElementById("upload-status").innerHTML = html;
+}
+
+async function handleFileUpload(file) {
+  const btnUpload = document.getElementById("btn-upload");
+  btnUpload.disabled = true;
+  btnUpload.textContent = "Procesando…";
+  setUploadStatus('<div class="banner">Leyendo y procesando el archivo, puede tardar unos segundos…</div>');
+
+  try {
+    // Yields a frame so the "Procesando…" message paints before the
+    // (synchronous, potentially multi-second) parse of a ~2400-column sheet.
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: "array" });
+    const records = parseWorkbookRecords(workbook);
+    if (!records.length) throw new Error("No se encontraron registros de capacitaciones en el archivo.");
+
+    state.records = records;
+    state.raw = { generado: new Date().toISOString().slice(0, 10), localUpload: true };
+
+    ["f-sucursal", "f-seccion", "f-curso", "f-estado", "f-prioridad"].forEach((id) => (document.getElementById(id).value = ""));
+    document.getElementById("f-search").value = "";
+    populateFilters();
+    applyFilters();
+
+    const alumnos = new Set(records.map((r) => r.id)).size;
+    const fecha = new Date().toLocaleString("es-CL");
+    document.getElementById("fuente-datos").innerHTML =
+      `<b>Vista local sin publicar</b> · cargada el ${fecha} desde "${escapeHtml(file.name)}"`;
+    setUploadStatus(`
+      <div class="banner">
+        <span>✅ <strong>${alumnos.toLocaleString("es-CL")}</strong> colaboradores y <strong>${records.length.toLocaleString("es-CL")}</strong> capacitaciones cargados desde "${escapeHtml(file.name)}".
+        Esta vista solo se actualizó en <b>tu navegador</b> — para publicarla para todos, descarga el archivo de abajo, reemplaza <code>data/capacitaciones.json</code> en el repositorio y haz commit + push.</span>
+      </div>
+    `);
+    document.getElementById("btn-download-json").hidden = false;
+    document.getElementById("btn-download-csv").hidden = false;
+  } catch (err) {
+    setUploadStatus(`<div class="banner error">✕ No se pudo procesar el archivo: ${escapeHtml(err.message)}</div>`);
+  } finally {
+    btnUpload.disabled = false;
+    btnUpload.textContent = "Cargar archivo .xlsx";
+  }
 }
 
 function escapeHtml(str) {
@@ -79,6 +261,7 @@ function populateFilters() {
 
 function fillSelect(id, options) {
   const el = document.getElementById(id);
+  while (el.options.length > 1) el.remove(1); // keep the "Todas/Todos" default, drop the rest
   for (const opt of options) {
     const o = document.createElement("option");
     o.value = opt;
@@ -449,21 +632,7 @@ function exportCsv() {
     if (pa !== pb) return pa - pb;
     return (a.fechaTermino || "9999").localeCompare(b.fechaTermino || "9999");
   });
-  const header = ["id_alumno", "nombre_alumno", "sucursal", "seccion", "curso", "fecha_inicio", "fecha_termino", "estado_curso", "nota", "prioridad", "accion_sugerida"];
-  const lines = [header.join(",")];
-  for (const r of sorted) {
-    const accion = accionSugerida(r.prioridad, r.dias);
-    const vals = [r.id, r.nombre, r.sucursal, r.seccion, r.curso, r.fechaInicio, r.fechaTermino, r.estadoCurso, r.nota, r.prioridad, accion]
-      .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`);
-    lines.push(vals.join(","));
-  }
-  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "plan_de_accion_filtrado.csv";
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadFile("plan_de_accion_filtrado.csv", buildExportCsv(sorted), "text/csv;charset=utf-8;");
 }
 
 function wireEvents() {
@@ -480,6 +649,21 @@ function wireEvents() {
   document.getElementById("btn-collab-back").addEventListener("click", () => {
     document.getElementById("f-sucursal").value = "";
     applyFilters();
+  });
+
+  document.getElementById("btn-upload").addEventListener("click", () => {
+    document.getElementById("file-upload").click();
+  });
+  document.getElementById("file-upload").addEventListener("change", (ev) => {
+    const file = ev.target.files[0];
+    if (file) handleFileUpload(file);
+    ev.target.value = ""; // allow re-selecting the same file name later
+  });
+  document.getElementById("btn-download-json").addEventListener("click", () => {
+    downloadFile("capacitaciones.json", JSON.stringify(buildExportData(state.records)), "application/json;charset=utf-8;");
+  });
+  document.getElementById("btn-download-csv").addEventListener("click", () => {
+    downloadFile("capacitaciones_long.csv", buildExportCsv(state.records), "text/csv;charset=utf-8;");
   });
 }
 

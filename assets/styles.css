@@ -82,6 +82,22 @@ header.top p { margin: 0; color: var(--text-secondary); font-size: 13px; }
 }
 .top-links a:hover { color: var(--series-1); border-color: var(--series-1); }
 
+.upload-card {
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 16px; margin-bottom: 20px;
+}
+.upload-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.upload-row h2 { font-size: 14px; margin: 0 0 2px; }
+.upload-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.upload-status { font-size: 12.5px; margin-top: 10px; }
+.upload-status:empty { margin-top: 0; }
+.upload-status .banner {
+  display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: 8px;
+  background: var(--warning-bg, rgba(250,178,25,0.15)); border: 1px solid var(--warning); color: var(--text-primary);
+}
+.upload-status .banner.error { background: rgba(208,59,59,0.12); border-color: var(--critical); }
+.upload-status .banner strong { font-weight: 600; }
+
 .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
 .kpi-tile {
   background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
