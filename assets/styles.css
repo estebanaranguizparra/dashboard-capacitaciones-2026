@@ -122,7 +122,7 @@ button.btn:hover { border-color: var(--series-1); color: var(--series-1); }
 button.btn.primary { background: var(--series-1); color: #fff; border-color: var(--series-1); }
 .active-filters { font-size: 12px; color: var(--text-muted); width: 100%; }
 
-.charts-row { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; margin-bottom: 20px; }
+.charts-row { display: grid; grid-template-columns: 1.3fr 0.85fr 0.85fr; gap: 16px; margin-bottom: 20px; }
 .chart-card {
   background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 16px;
 }
@@ -158,7 +158,8 @@ button.btn.primary { background: var(--series-1); color: #fff; border-color: var
 }
 .estado-bar-col .bar { width: 100%; max-width: 64px; border-radius: 4px 4px 2px 2px; transition: opacity 0.15s; }
 .estado-bar-col .val { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.estado-bar-col .lbl { font-size: 11px; color: var(--text-secondary); text-align: center; }
+.estado-bar-col .lbl { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary); text-align: center; }
+.estado-bar-col .lbl-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .estado-bar-col:hover { background: var(--surface-2); }
 .estado-bar-col:hover .lbl { color: var(--series-1); }
 .estado-bar-col:focus-visible { outline: 2px solid var(--series-1); outline-offset: 1px; }

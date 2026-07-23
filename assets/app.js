@@ -131,6 +131,7 @@ function applyFilters() {
   renderKPIs();
   renderChartSucursal(f);
   renderChartEstado(f);
+  renderChartPrioridad(f);
   renderTable();
 }
 
@@ -246,6 +247,54 @@ function renderChartEstado(f) {
       <div class="val">${val.toLocaleString("es-CL")}</div>
       <div class="bar" style="height:${h}%; background:${colors[estado]}"></div>
       <div class="lbl">${estado}</div>
+    `;
+    container.appendChild(col);
+  }
+}
+
+const PRIORIDAD_LABELS = ["Alta", "Media", "Baja", "Sin acción"];
+// Status semantics, not an arbitrary category: Alta=critical, Media=warning,
+// Baja=neutral (still on track), Sin acción=good (already completed).
+const PRIORIDAD_COLORS = {
+  Alta: "var(--critical)",
+  Media: "var(--warning)",
+  Baja: "var(--text-muted)",
+  "Sin acción": "var(--good)",
+};
+
+function renderChartPrioridad(f) {
+  // Ignores its own "prioridad" filter for the same cross-filtering reason
+  // as the other two charts.
+  const rows = state.records.filter((r) => matchesFilters(r, f, ["prioridad"]));
+  const counts = { Alta: 0, Media: 0, Baja: 0, "Sin acción": 0 };
+  for (const r of rows) {
+    if (counts[r.prioridad] !== undefined) counts[r.prioridad] += 1;
+  }
+  const max = Math.max(1, ...Object.values(counts));
+  const container = document.getElementById("chart-prioridad");
+  container.innerHTML = "";
+  for (const prioridad of PRIORIDAD_LABELS) {
+    const val = counts[prioridad];
+    const col = document.createElement("div");
+    const isSelected = f.prioridad === prioridad;
+    col.className = "estado-bar-col" + (isSelected ? " selected" : "");
+    col.setAttribute("role", "button");
+    col.setAttribute("tabindex", "0");
+    col.setAttribute("aria-pressed", String(isSelected));
+    col.title = `${prioridad} — clic para ${isSelected ? "quitar" : "aplicar"} como filtro`;
+    const activate = () => toggleFilterAndApply("f-prioridad", prioridad);
+    col.addEventListener("click", activate);
+    col.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        activate();
+      }
+    });
+    const h = Math.max((val / max) * 100, val > 0 ? 4 : 0);
+    col.innerHTML = `
+      <div class="val">${val.toLocaleString("es-CL")}</div>
+      <div class="bar" style="height:${h}%; background:${PRIORIDAD_COLORS[prioridad]}"></div>
+      <div class="lbl"><span class="lbl-dot" style="background:${PRIORIDAD_COLORS[prioridad]}"></span>${prioridad}</div>
     `;
     container.appendChild(col);
   }
